@@ -10,7 +10,7 @@ import cv2
 
 # デバッグのレベル
 global debug_out_lv
-debug_out_lv = 0
+debug_out_lv = 2
 
 def ArcRatio(cont) :
     """
@@ -37,7 +37,7 @@ def ArcRatio(cont) :
         ret = (arcLen / 4) * (arcLen / 4) / area
         return ret
 
-def ReFineCont( cont, thick ) :
+def ReFineCont( cont_array, size_img, thick ) :
     """
     Refine the contour
 
@@ -53,16 +53,17 @@ def ReFineCont( cont, thick ) :
     cont : cv::Contour
         refined contour
     """
-    rect = cv2.boundingRect(cont)
-    img = np.zeros((rect[1]+rect[3]+(thick*4), rect[0]+rect[2]+(thick*4), 1), np.uint8)
-    cv2.polylines( img, [cont], True, 255, thick )
+    img = np.zeros((size_img["h"], size_img["w"], 1), np.uint8)
+    for cont in cont_array:
+        cv2.polylines( img, [cont], True, 255, thick )
+
     img = cv2.morphologyEx(img, cv2.MORPH_CLOSE, np.ones((thick,thick),np.uint8))
     img, conts, _ = cv2.findContours(img, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
     if debug_out_lv >= 2 :
         cv2.imshow("cont", img )
 
-    return conts[0]
+    return conts
 
 def FindContRet(img_seg, cont_init, ratio_min, cth) :
     """
@@ -131,7 +132,7 @@ def FindContRet(img_seg, cont_init, ratio_min, cth) :
 start = time.time()
 
 # jsonを読み込み
-json_path = "C:\Projects\_study\Python\sample\\_tmp.json"
+json_path = "C:\Project\Mason\src\Python\sample\_tmp.json"
 if len(sys.argv) >= 2:
     json_path = sys.argv[1]
     #print( json_path )
@@ -142,71 +143,90 @@ file_json = open(json_path, 'r')
 json_dict = json.load(file_json) 
 file_json.close()
 
-# データの取り出しと整形
-file_path = json_dict["imagePath"]
-init_cnt_data = json_dict["initialContours"][0]
-cont_list = list()
-for xy in init_cnt_data :
-    cont_list.append( [int(xy["x"]), int(xy["y"])] )
-pts_init = np.array(cont_list, np.int32)
-
 # 画像を読む
+file_path = json_dict["imagePath"]
 img_org = cv2.imread(file_path)
 img_h = img_org.shape[0]
 img_w = img_org.shape[1]
+size_img = dict()
+size_img["h"] = img_h
+size_img["w"] = img_w
 
-# 処理領域を決める
-rect_init = cv2.boundingRect(pts_init)
-rect_proc = [0,0,0,0]
-rect_proc[0] = max( rect_init[0] - rect_init[2], 0 )
-rect_proc[1] = max( rect_init[1] - rect_init[3], 0 )
-rect_proc[2] = min( rect_init[2] * 3, img_w - rect_proc[0] )
-rect_proc[3] = min( rect_init[3] * 3, img_h - rect_proc[1] )
-#print(rect_proc)
-
-for xy in pts_init :
-    xy[0] -= rect_proc[0]
-    xy[1] -= rect_proc[1]
-
-
-# 初期輪郭を整形する
-cont_init = ReFineCont( pts_init, 2 )
-
-# 画像の切り出しとセグメンテーション
-img_trm = img_org[rect_proc[1]:rect_proc[1]+rect_proc[3],rect_proc[0]:rect_proc[0]+rect_proc[2]]
-img_seg = cv2.pyrMeanShiftFiltering(img_trm, 4, 16, 0 )
+# 先に全体をセグメンテーション
+img_seg = cv2.pyrMeanShiftFiltering(img_org, 4, 16, 0 )
 img_seg = cv2.medianBlur(img_seg, 3)
 
-if debug_out_lv >= 2 :
-    cv2.imshow("img_seg", img_seg)
+# 輪郭データの取り出しと整形
+# init_cnt_data = json_dict["initialContours"][0]
+cont_list_Array = list()
+rect_proc_Array = list()
+for init_cnt_data in json_dict["initialContours"] :
+    cont_list = list()
+    for xy in init_cnt_data :
+        cont_list.append( [int(xy["x"]), int(xy["y"])] )
+    pts_init = np.array(cont_list, np.int32)
 
 
-# 輪郭検出
-ratio_min = 9999.0
-cont_ret = cont_init
-th = 128
-while ratio_min >= 2 and th >= 16:
-    ratio, cont_fnd = FindContRet(img_seg, cont_init, ratio_min, th )
-    if ratio < ratio_min:
-        ratio_min = ratio
-        cont_ret = cont_fnd
-    th /= 1.4
+    # 処理領域
+    rect_init = cv2.boundingRect(pts_init)
+    rect_proc = [0,0,img_w,img_h]
+    rect_proc[0] = max( rect_init[0] - rect_init[2], 0 )
+    rect_proc[1] = max( rect_init[1] - rect_init[3], 0 )
+    rect_proc[2] = min( rect_init[2] * 3, img_w - rect_proc[0] )
+    rect_proc[3] = min( rect_init[3] * 3, img_h - rect_proc[1] )
+    rect_proc_Array.append(rect_proc)
+    #print(rect_proc)
 
-cont_ret = ReFineCont(cont_ret, 4)
+    for xy in pts_init :
+        xy[0] -= rect_proc[0]
+        xy[1] -= rect_proc[1]
+
+
+    # 初期輪郭を整形する
+    # cont_init = ReFineCont( pts_init, 2 )
+    cont_init = pts_init
+
+    # 画像の切り出し
+    img_trm = img_seg[rect_proc[1]:rect_proc[1]+rect_proc[3],rect_proc[0]:rect_proc[0]+rect_proc[2]]
+
+    if debug_out_lv >= 2 :
+        cv2.imshow("img_trm", img_trm)
+
+
+    # 輪郭検出
+    ratio_min = 9999.0
+    cont_ret = cont_init
+    th = 128
+    while ratio_min >= 2 and th >= 16:
+        ratio, cont_fnd = FindContRet(img_trm, cont_init, ratio_min, th )
+        if ratio < ratio_min:
+            ratio_min = ratio
+            cont_ret = cont_fnd
+        th /= 1.4
+
+    # cont_ret = ReFineCont(cont_ret, 4)
+    for i in range( len(cont_ret) ):
+        cont_ret[i][0][0] += rect_proc[0]
+        cont_ret[i][0][1] += rect_proc[1]
+    cont_list_Array.append(cont_ret)
+
+# 輪郭の整理(必要に応じて結合)
+cont_list_Array = ReFineCont(cont_list_Array, size_img, 4)
 
 
 # json出力
-pts_ret = []
-for i in range( len(cont_ret) ):
-    x = cont_ret[i][0][0]
-    y = cont_ret[i][0][1]
-    pt_dic = {}
-    pt_dic["x"] = int(x) + rect_proc[0]
-    pt_dic["y"] = int(y) + rect_proc[1]
-    pts_ret.append( pt_dic )
+pts_ary_ret = []
+for cont in cont_list_Array:
+    pts_ret = []
+    for i in range( len(cont) ):
+        pt_dic = {}
+        pt_dic["x"] = int(cont[i][0][0])
+        pt_dic["y"] = int(cont[i][0][1])
+        pts_ret.append( pt_dic )
+    pts_ary_ret.append(pts_ret)
 
 dict_ret = {}
-dict_ret["contours"] = [pts_ret]
+dict_ret["contours"] = [pts_ary_ret]
 
 #print(json.dumps(dict_ret, indent=4))
 root, ext = os.path.splitext(json_path)
@@ -221,13 +241,15 @@ elapsed_time = time.time() - start
 
 
 # 画像のと表示
-img_mask = np.zeros((rect_proc[3], rect_proc[2], 3), np.uint8)
-img_mask = cv2.drawContours(img_mask, [cont_ret], 0, (255,255,255), -1)
-img_mask = cv2.bitwise_and( img_seg.copy(), img_mask )
+img_mask = np.zeros((img_h, img_w, 3), np.uint8)
+for cont in cont_list_Array:
+    img_mask = cv2.drawContours(img_mask, [cont], 0, (255,255,255), -1)
+    img_mask = cv2.bitwise_and( img_seg.copy(), img_mask )
 
 alpha = 0.75
 img_ret = cv2.addWeighted(img_mask, alpha, img_seg, 1 - alpha, 0) 
-img_ret = cv2.drawContours(img_ret, [cont_ret], 0, (255,255,255), 2)
+for cont in cont_list_Array:
+    img_ret = cv2.drawContours(img_ret, [cont], 0, (255,255,255), 2)
 
 cv2.imwrite(root + "_Mason.jpg", img_ret)
 if debug_out_lv >= 1:

@@ -19,7 +19,14 @@ namespace WpfDraw
 {
     public partial class MainWindow : Window
     {
-        List<Point> points = new List<Point>();
+        const string PY_ENV_PATH = @"C:\Miniconda3\envs\py36\python.exe";
+        const string MASON_PY_PATH = @"C:\Project\Mason\src\Python\Mason\Mason.py";
+        const string INIT_IMAGE_PATH = @"C:\Project\Mason\src\Python\sample\sample.jpg";
+
+        List<OpenCvSharp.Point> points = null;
+        List<List<OpenCvSharp.Point>> pointss = new List<List<OpenCvSharp.Point>>();
+        public static OpenCvSharp.Point ToCvPt(Point pt ) { return new OpenCvSharp.Point(pt.X, pt.Y); }
+
         Size imgSize;
         string imgPath = "";
 
@@ -57,6 +64,70 @@ namespace WpfDraw
         public MainWindow()
         {
             InitializeComponent();
+
+            if (File.Exists(INIT_IMAGE_PATH))
+            {
+                LoadImage(INIT_IMAGE_PATH);
+            }
+        }
+
+        private void LoadImage( string imgPathOrg)
+        {
+            BitmapImage bmpImgPrc = new BitmapImage(); // デコードされたビットマップイメージのインスタンスを作る。
+            try
+            {
+                // 一度解像度を整えて、固定パスに出力
+                System.Drawing.Bitmap bmp = null;
+                {
+                    BitmapImage bmpImgSrc = new BitmapImage();
+                    bmpImgSrc.BeginInit();
+                    bmpImgSrc.UriSource = new Uri(imgPathOrg); // ビットマップイメージのソースにファイルを指定する。
+                    bmpImgSrc.EndInit();
+
+                    var encoder = new System.Windows.Media.Imaging.BmpBitmapEncoder();
+                    encoder.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(bmpImgSrc));
+                    using (var ms = new System.IO.MemoryStream())
+                    {
+                        encoder.Save(ms);
+                        ms.Seek(0, System.IO.SeekOrigin.Begin);
+                        using (var temp = new System.Drawing.Bitmap(ms))
+                        {
+                            // このおまじないの意味は参考資料を参照
+                            bmp = new System.Drawing.Bitmap(temp);
+                        }
+                    }
+                }
+                // 解像度設定
+                bmp.SetResolution(96, 96);
+
+                // 一度固定ファイルとして保存
+                imgPath = System.IO.Path.GetDirectoryName(imgPathOrg) + "\\_tmp.jpg";
+                bmp.Save(imgPath, System.Drawing.Imaging.ImageFormat.Jpeg);
+                bmp.Dispose();
+
+                //  再読込
+                bmpImgPrc.BeginInit();
+                bmpImgPrc.UriSource = new Uri(imgPath); // ビットマップイメージのソースにファイルを指定する。
+                bmpImgPrc.EndInit();
+
+
+                ImageBrush imageBrush = new ImageBrush();
+                imageBrush.ImageSource = bmpImgPrc;
+                imageBrush.Stretch = Stretch.None;
+                imageBrush.AlignmentX = AlignmentX.Left;
+                imageBrush.AlignmentY = AlignmentY.Top;
+
+                imgSize.Width = bmpImgPrc.PixelWidth;
+                imgSize.Height = bmpImgPrc.PixelHeight;
+
+                canvas.Background = imageBrush; // Imageコントロールにバインディングする。
+
+                this.Title = System.IO.Path.GetFileName(imgPath);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(ex.Message);
+            }
         }
 
         private void event_DragEnter(object sender, DragEventArgs e)
@@ -69,62 +140,7 @@ namespace WpfDraw
             if (e.Data.GetDataPresent(DataFormats.FileDrop)) // ドロップされたものがファイルかどうか確認する。
             {
                 var imgPathOrg = ((string[])e.Data.GetData(DataFormats.FileDrop))[0]; // ドロップされた最初のファイルのファイル名を得る。
-
-                BitmapImage bmpImgPrc = new BitmapImage(); // デコードされたビットマップイメージのインスタンスを作る。
-                try
-                {
-                    // 一度解像度を整えて、固定パスに出力
-                    System.Drawing.Bitmap bmp = null;
-                    {
-                        BitmapImage bmpImgSrc = new BitmapImage();
-                        bmpImgSrc.BeginInit();
-                        bmpImgSrc.UriSource = new Uri(imgPathOrg); // ビットマップイメージのソースにファイルを指定する。
-                        bmpImgSrc.EndInit();
-
-                        var encoder = new System.Windows.Media.Imaging.BmpBitmapEncoder();
-                        encoder.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(bmpImgSrc));
-                        using (var ms = new System.IO.MemoryStream())
-                        {
-                            encoder.Save(ms);
-                            ms.Seek(0, System.IO.SeekOrigin.Begin);
-                            using (var temp = new System.Drawing.Bitmap(ms))
-                            {
-                                // このおまじないの意味は参考資料を参照
-                                bmp = new System.Drawing.Bitmap(temp);
-                            }
-                        }
-                    }
-                    // 解像度設定
-                    bmp.SetResolution(96, 96);
-
-                    // 一度固定ファイルとして保存
-                    imgPath = System.IO.Path.GetDirectoryName(imgPathOrg) + "\\_tmp.jpg";
-                    bmp.Save(imgPath, System.Drawing.Imaging.ImageFormat.Jpeg);
-                    bmp.Dispose();
-
-                    //  再読込
-                    bmpImgPrc.BeginInit();
-                    bmpImgPrc.UriSource = new Uri(imgPath); // ビットマップイメージのソースにファイルを指定する。
-                    bmpImgPrc.EndInit();
-
-
-                    ImageBrush imageBrush = new ImageBrush();
-                    imageBrush.ImageSource = bmpImgPrc;
-                    imageBrush.Stretch = Stretch.None;
-                    imageBrush.AlignmentX = AlignmentX.Left;
-                    imageBrush.AlignmentY = AlignmentY.Top;
-
-                    imgSize.Width = bmpImgPrc.PixelWidth;
-                    imgSize.Height = bmpImgPrc.PixelHeight;
-
-                    canvas.Background = imageBrush; // Imageコントロールにバインディングする。
-
-                    this.Title = System.IO.Path.GetFileName(imgPath);
-                }
-                catch (Exception ex)
-                {
-                    MessageBox.Show(ex.Message);
-                }
+                LoadImage(imgPathOrg);
             }
         }
 
@@ -179,8 +195,8 @@ namespace WpfDraw
             SetStartPoint(canvas, e.GetPosition(canvas));
             Debug.WriteLine(e);
 
-            points.Clear();
-            points.Add(e.GetPosition(canvas));
+            points = new List<OpenCvSharp.Point>();
+            points.Add(ToCvPt(e.GetPosition(canvas)));
         }
 
         private void canvas_MouseMove(object sender, MouseEventArgs e)
@@ -214,7 +230,7 @@ namespace WpfDraw
 
             SetStartPoint(canvas, current);
 
-            points.Add(e.GetPosition(canvas));
+            points.Add(ToCvPt(e.GetPosition(canvas)));
         }
 
         private void canvas_MouseUp(object sender, MouseButtonEventArgs e)
@@ -222,20 +238,35 @@ namespace WpfDraw
             SetDragged(canvas, false);
             Debug.WriteLine(e);
 
-            points.Add(e.GetPosition(canvas));
+            points.Add(ToCvPt(e.GetPosition(canvas)));
+            pointss.Add(OpenCvSharp.Cv2.ApproxPolyDP(points, 4, true).ToList());
 
+            //  JSONの出力
             string json = makeJsonStr();
+            var jsonPath = System.IO.Path.Combine(System.IO.Path.GetDirectoryName(imgPath), System.IO.Path.GetFileNameWithoutExtension(imgPath) + ".json");
+            try
+            {
+                File.WriteAllText(jsonPath, json);
+            }
+            catch
+            {
+                MessageBox.Show("Jsonファイル、出力できんで。\n" + jsonPath);
+            }
 
-            var jsonPath = System.IO.Path.Combine( System.IO.Path.GetDirectoryName(imgPath), System.IO.Path.GetFileNameWithoutExtension(imgPath) + ".json" );
-            File.WriteAllText(jsonPath, json);
 
+            //  Pythonの実行
+            DoMasonPy(jsonPath);
+        }
+        #endregion
 
+        private void DoMasonPy( string jsonPath )
+        {
 
             //プロセスの準備
             System.Diagnostics.Process p = new System.Diagnostics.Process();
-            p.StartInfo.FileName = @"C:\Miniconda3\envs\py36\python.exe";
-            p.StartInfo.Arguments = @"C:\Projects\_study\Python\python-demo\Mason.py " + jsonPath + " 2";
-//            p.StartInfo.CreateNoWindow = true;
+            p.StartInfo.FileName = PY_ENV_PATH;
+            p.StartInfo.Arguments = MASON_PY_PATH + " " + jsonPath + " 2";
+            //            p.StartInfo.CreateNoWindow = true;
             //出力を読み取れるようにする
             p.StartInfo.UseShellExecute = false;
             p.StartInfo.RedirectStandardOutput = true;
@@ -251,25 +282,39 @@ namespace WpfDraw
             p.WaitForExit();
             var exitCode = p.ExitCode;
             p.Close();
-
         }
-        #endregion
 
         private string makeJsonStr()
         {
             string json = "{\n";
             json += "	\"imagePath\" : \"" + imgPath.Replace("\\", "/") + "\",\n";
-            json += "	\"initialContours\":[[\n";
-            for(var i = 0; i < points.Count; i++)
+            json += "	\"initialContours\":[\n";
+            for (var ic = 0; ic < pointss.Count; ic++)
             {
-                json += "		{ \"x\":" + points[i].X + ", \"y\":" + points[i].Y + " }";
-                if( i < points.Count -1 ) {
-                    json += ",\n";
-                } else {
-                    json += "\n";
+                json += "		[\n";
+                var cnots = pointss[ic];
+                for (var ip = 0; ip < cnots.Count; ip++)
+                {
+                    json += "			{ \"x\":" + cnots[ip].X + ", \"y\":" + cnots[ip].Y + " }";
+                    if (ip < cnots.Count - 1)
+                    {
+                        json += ",\n";
+                    }
+                    else
+                    {
+                        json += "\n";
+                    }
+                }
+                if (ic < pointss.Count - 1)
+                {
+                    json += "		],\n";
+                }
+                else
+                {
+                    json += "		]\n";
                 }
             }
-            json += "	]]\n}\n";
+            json += "   ]\n}\n";
             return json;
         }
     }
