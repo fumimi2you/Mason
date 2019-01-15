@@ -132,7 +132,8 @@ def FindContRet(img_seg, cont_init, ratio_min, cth) :
 start = time.time()
 
 # jsonを読み込み
-json_path = "C:\Project\Mason\src\Python\sample\_tmp.json"
+py_path = os.path.dirname(os.path.abspath(__file__))
+json_path = py_path + "\..\sample\_tmp.json"
 if len(sys.argv) >= 2:
     json_path = sys.argv[1]
     #print( json_path )
@@ -146,6 +147,8 @@ file_json.close()
 # 画像を読む
 file_path = json_dict["imagePath"]
 img_org = cv2.imread(file_path)
+if img_org is None:
+    img_org = cv2.imread(os.path.dirname(json_path) + file_path )
 img_h = img_org.shape[0]
 img_w = img_org.shape[1]
 size_img = dict()
@@ -234,7 +237,8 @@ output_path = root + "_Mason" + ext
 f = open(output_path, "w")
 json.dump(dict_ret,f,indent=4)
 f.close()
-print (json.dumps(dict_ret,indent=4))
+print_string = json.dumps(dict_ret,indent=4)
+print (print_string)
 
 elapsed_time = time.time() - start
 #print ("elapsed_time:{0}".format(elapsed_time) + "[sec]")
