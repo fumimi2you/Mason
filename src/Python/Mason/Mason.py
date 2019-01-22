@@ -1,3 +1,4 @@
+# coding:utf-8
 import sys
 import os
 import time
@@ -6,7 +7,6 @@ import json
 # OpenCv インストールしてけろ。
 import numpy as np
 import cv2
-
 
 # デバッグのレベル
 global debug_out_lv
@@ -114,7 +114,7 @@ def FindContRet(img_seg, cont_init, ratio_min, cth) :
                 ratio = ( max(area_init, area_cnt) / min(area_init, area_cnt) ) * aratio
                 #print(match_val)
                 if ratio < ratio_min:
-                    print( "cth, mth, ratio : " + str(cth) + ", " + str(mth) + ", " + str(ratio) )
+                    #print( "cth, mth, ratio : " + str(cth) + ", " + str(mth) + ", " + str(ratio) )
                     cont_ret = cont
                     ratio_min = ratio
         
@@ -134,10 +134,10 @@ start = time.time()
 json_path = "C:\Projects\_study\Python\sample\\_tmp.json"
 if len(sys.argv) >= 2:
     json_path = sys.argv[1]
-    print( json_path )
+    #print( json_path )
 if len(sys.argv) >= 3 :
     debug_out_lv = int(sys.argv[2])
-    print( debug_out_lv )
+    #print( debug_out_lv )
 file_json = open(json_path, 'r') 
 json_dict = json.load(file_json) 
 file_json.close()
@@ -162,7 +162,7 @@ rect_proc[0] = max( rect_init[0] - rect_init[2], 0 )
 rect_proc[1] = max( rect_init[1] - rect_init[3], 0 )
 rect_proc[2] = min( rect_init[2] * 3, img_w - rect_proc[0] )
 rect_proc[3] = min( rect_init[3] * 3, img_h - rect_proc[1] )
-print(rect_proc)
+#print(rect_proc)
 
 for xy in pts_init :
     xy[0] -= rect_proc[0]
@@ -214,10 +214,10 @@ output_path = root + "_Mason" + ext
 f = open(output_path, "w")
 json.dump(dict_ret,f,indent=4)
 f.close()
-
+print (json.dumps(dict_ret,indent=4))
 
 elapsed_time = time.time() - start
-print ("elapsed_time:{0}".format(elapsed_time) + "[sec]")
+#print ("elapsed_time:{0}".format(elapsed_time) + "[sec]")
 
 
 # 画像のと表示

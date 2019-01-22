@@ -4,6 +4,7 @@ module.exports = (function(){
   "use strict";
 
   let fs = require('fs');
+  var S3_saver = require('./S3.js');
 
   let canvas_to_base64 = function(canvas){
       return canvas.toDataURL().split(',')[1];
@@ -12,7 +13,8 @@ module.exports = (function(){
   // 追記: もっと簡単にできる方法がたしかあります(その方法は忘れました)
   let decode_and_copy = function(string, filename, callback) {
       let buffer = new Buffer(string, 'base64');
-      fs.writeFile(filename, buffer, callback);
+      S3_saver.save(buffer,filename);
+      //fs.writeFile(filename, buffer, callback);
   }
 
   return {
