@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="77px" height="46px" viewBox="0 0 77 46" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <!-- Generator: Sketch 52.5 (67469) - http://www.bohemiancoding.com/sketch -->
+    <title>Untitled 2</title>
+    <desc>Created with Sketch.</desc>
+    <g id="Page-1" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <path d="M38.5,42.645898 L45.572949,28.5 L75,28.5 C75.2761424,28.5 75.5,28.2761424 75.5,28 L75.5,2 C75.5,1.72385763 75.2761424,1.5 75,1.5 L2,1.5 C1.72385763,1.5 1.5,1.72385763 1.5,2 L1.5,28 C1.5,28.2761424 1.72385763,28.5 2,28.5 L31.427051,28.5 L38.5,42.645898 Z" id="Combined-Shape" stroke="#5479A1" stroke-width="3" fill="#FFFFFF" fill-rule="nonzero"></path>
+        <text id="start" font-family="Impact" font-size="16" font-style="condensed" font-weight="700" fill="#5479A1">
+            <tspan x="23" y="21">start</tspan>
+        </text>
+    </g>
+</svg>
