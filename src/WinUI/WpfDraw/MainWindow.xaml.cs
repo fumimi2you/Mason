@@ -288,7 +288,7 @@ namespace WpfDraw
         {
             string json = "{\n";
             json += "	\"imagePath\" : \"" + imgPath.Replace("\\", "/") + "\",\n";
-            json += "	\"initialContours\":[\n";
+            json += "	\"addContourSeeds\":[\n";
             for (var ic = 0; ic < pointss.Count; ic++)
             {
                 json += "		[\n";

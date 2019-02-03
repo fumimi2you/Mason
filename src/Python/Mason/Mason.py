@@ -10,7 +10,7 @@ import cv2
 
 # デバッグのレベル
 global debug_out_lv
-debug_out_lv = 2
+debug_out_lv = 0
 
 def ArcRatio(cont) :
     """
@@ -37,7 +37,7 @@ def ArcRatio(cont) :
         ret = (arcLen / 4) * (arcLen / 4) / area
         return ret
 
-def ReFineCont( cont_array, size_img, thick ) :
+def ReFineCont( cont_array_valid, cont_array_invalid, img_seg, thick ) :
     """
     Refine the contour
 
@@ -53,15 +53,23 @@ def ReFineCont( cont_array, size_img, thick ) :
     cont : cv::Contour
         refined contour
     """
-    img = np.zeros((size_img["h"], size_img["w"], 1), np.uint8)
-    for cont in cont_array:
-        cv2.polylines( img, [cont], True, 255, thick )
+    img = np.zeros((img_seg.shape[0], img_seg.shape[1], 1), np.uint8)
 
-    img = cv2.morphologyEx(img, cv2.MORPH_CLOSE, np.ones((thick,thick),np.uint8))
-    img, conts, _ = cv2.findContours(img, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    # 有効領域の塗りつぶし
+    cv2.drawContours( img, cont_array_valid, -1, (255, 255, 255 ), -1 )
+
+    # 無効領域の削減
+    cv2.drawContours( img, cont_array_invalid, 0, (0, 0, 0 ), -1 )
+
+    # img = cv2.morphologyEx(img, cv2.MORPH_CLOSE, np.ones((thick,thick),np.uint8))
+    kernel = np.ones((3,3),np.uint8)
+    img = cv2.dilate(img, kernel, thick)
+    img = cv2.erode(img, kernel, thick)
+    img_cnt, conts, _ = cv2.findContours(img, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
     if debug_out_lv >= 2 :
-        cv2.imshow("cont", img )
+        img_cnt_col = cv2.cvtColor(img_cnt, cv2.COLOR_GRAY2RGB)
+        cv2.imshow("img_cnt_col", cv2.addWeighted( img_cnt_col, 0.5, img_seg, 0.5, 0 ) )
 
     return conts
 
@@ -98,15 +106,23 @@ def FindContRet(img_seg, cont_init, ratio_min, cth) :
     img_gry = cv2.cvtColor(img_seg, cv2.COLOR_BGR2GRAY)
     img_cny = cv2.Canny(img_gry, cth, cth*1.5)
 
+    if debug_out_lv >= 2:
+        img_cny_col = cv2.cvtColor(img_cny, cv2.COLOR_GRAY2RGB)
+        cv2.imshow("img_cny", cv2.addWeighted( img_cny_col, 0.5, img_seg, 0.5, 0 ))
+
     # クロージングして輪郭検出
     cont_ret = []
     for mth in range(2, 5, 2):
 
-        img_cls = cv2.morphologyEx(img_cny, cv2.MORPH_CLOSE, np.ones((mth,mth),np.uint8))
+        # img_cls = cv2.morphologyEx(img_cny, cv2.MORPH_CLOSE, np.ones((mth,mth),np.uint8))
+        kernel = np.ones((3,3),np.uint8)
+        img_dil = cv2.dilate(img_cny, kernel, mth)
+        img_cls = cv2.erode(img_dil, kernel, mth)
         _, contours, _ = cv2.findContours(img_cls, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
 
         if debug_out_lv >= 3:
-            cv2.imshow("img_cls_" + str(int(cth)) + "_" + str(mth) , img_cls)
+            img_cls_col = cv2.cvtColor(img_cls, cv2.COLOR_GRAY2RGB)
+            cv2.imshow("img_cls_" + str(int(cth)) + "_" + str(mth) , cv2.addWeighted( img_cls_col, 0.5, img_seg, 0.5, 0 ))
 
         for cont in contours:
             area_cnt = float( cv2.contourArea(cont) )
@@ -123,6 +139,68 @@ def FindContRet(img_seg, cont_init, ratio_min, cth) :
             break
 
     return ratio_min, cont_ret
+
+
+def FindContFromSeed(img_seg, cnt_src) :
+
+    if len(cnt_src) <= 2 : 
+        return None
+
+    cont_list = list()
+    for xy in cnt_src :
+        cont_list.append( [int(xy["x"]), int(xy["y"])] )
+    pts_init = np.array(cont_list, np.int32)
+
+    # 処理領域
+    rect_init = cv2.boundingRect(pts_init)
+    rect_proc = [0,0,img_w,img_h]
+    rect_proc[0] = max( rect_init[0] - rect_init[2], 0 )
+    rect_proc[1] = max( rect_init[1] - rect_init[3], 0 )
+    rect_proc[2] = min( rect_init[2] * 3, img_w - rect_proc[0] )
+    rect_proc[3] = min( rect_init[3] * 3, img_h - rect_proc[1] )
+    #print(rect_proc)
+
+    for xy in pts_init :
+        xy[0] -= rect_proc[0]
+        xy[1] -= rect_proc[1]
+
+
+    # 初期輪郭を整形する
+    cont_init = pts_init
+
+    # 画像の切り出し
+    img_trm = img_seg[rect_proc[1]:rect_proc[1]+rect_proc[3],rect_proc[0]:rect_proc[0]+rect_proc[2]]
+
+    # if debug_out_lv >= 2 :
+    #     cv2.imshow("img_trm", img_trm)
+
+    # 輪郭検出
+    ratio_min = 9999.0
+    cont_ret = cont_init
+    th = 128
+    while ratio_min >= 2 and th >= 16:
+        ratio, cont_fnd = FindContRet(img_trm, cont_init, ratio_min, th )
+        if ratio < ratio_min:
+            ratio_min = ratio
+            cont_ret = cont_fnd
+        th /= 1.4
+
+    if debug_out_lv >= 2 :
+        img_trm_copy = img_trm.copy()
+        cv2.drawContours( img_trm_copy, [cont_fnd], 0, (255, 255, 255 ), -1 )
+        cv2.imshyow("img_trm", img_trm_copy)
+
+    for i in range( len(cont_ret) ):
+        cont_ret[i][0][0] += rect_proc[0]
+        cont_ret[i][0][1] += rect_proc[1]
+
+    # if debug_out_lv >= 2 :
+    #     img_seg_copy = img_seg.copy()
+    #     cv2.polylines( img_seg_copy, cont_ret, True, 255, 2 )
+    #     cv2.imshow("img_seg", img_seg_copy)
+
+    return cont_ret
+
 
 ############################################################################
 ## MainFunction
@@ -159,62 +237,27 @@ size_img["w"] = img_w
 img_seg = cv2.pyrMeanShiftFiltering(img_org, 4, 16, 0 )
 img_seg = cv2.medianBlur(img_seg, 3)
 
-# 輪郭データの取り出しと整形
-# init_cnt_data = json_dict["initialContours"][0]
-cont_list_Array = list()
-rect_proc_Array = list()
-for init_cnt_data in json_dict["initialContours"] :
-    cont_list = list()
-    for xy in init_cnt_data :
-        cont_list.append( [int(xy["x"]), int(xy["y"])] )
-    pts_init = np.array(cont_list, np.int32)
+# Fixed輪郭の取り出し
+cont_array_valid = list()
+if "fixedContours" in json_dict :
+    for cnt_src in json_dict["fixedContours"] :
+        cont_list = list()
+        for xy in cnt_src :
+            cont_list.append( [int(xy["x"]), int(xy["y"])] )
+        cont_array_valid.append( np.array(cont_list, np.int32) )
 
+# 追加する輪郭データ初期値の取り出しと整形
+if "addContourSeeds" in json_dict :
+    for cnt_src in json_dict["addContourSeeds"] :
+        cont_array_valid.append( FindContFromSeed(img_seg, cnt_src) )
 
-    # 処理領域
-    rect_init = cv2.boundingRect(pts_init)
-    rect_proc = [0,0,img_w,img_h]
-    rect_proc[0] = max( rect_init[0] - rect_init[2], 0 )
-    rect_proc[1] = max( rect_init[1] - rect_init[3], 0 )
-    rect_proc[2] = min( rect_init[2] * 3, img_w - rect_proc[0] )
-    rect_proc[3] = min( rect_init[3] * 3, img_h - rect_proc[1] )
-    rect_proc_Array.append(rect_proc)
-    #print(rect_proc)
-
-    for xy in pts_init :
-        xy[0] -= rect_proc[0]
-        xy[1] -= rect_proc[1]
-
-
-    # 初期輪郭を整形する
-    # cont_init = ReFineCont( pts_init, 2 )
-    cont_init = pts_init
-
-    # 画像の切り出し
-    img_trm = img_seg[rect_proc[1]:rect_proc[1]+rect_proc[3],rect_proc[0]:rect_proc[0]+rect_proc[2]]
-
-    if debug_out_lv >= 2 :
-        cv2.imshow("img_trm", img_trm)
-
-
-    # 輪郭検出
-    ratio_min = 9999.0
-    cont_ret = cont_init
-    th = 128
-    while ratio_min >= 2 and th >= 16:
-        ratio, cont_fnd = FindContRet(img_trm, cont_init, ratio_min, th )
-        if ratio < ratio_min:
-            ratio_min = ratio
-            cont_ret = cont_fnd
-        th /= 1.4
-
-    # cont_ret = ReFineCont(cont_ret, 4)
-    for i in range( len(cont_ret) ):
-        cont_ret[i][0][0] += rect_proc[0]
-        cont_ret[i][0][1] += rect_proc[1]
-    cont_list_Array.append(cont_ret)
+cont_array_invalid = list()
+if "reductContourSeeds" in json_dict :
+    for cnt_src in json_dict["reductContourSeeds"] :
+        cont_array_invalid.append( FindContFromSeed(img_seg, cnt_src) )
 
 # 輪郭の整理(必要に応じて結合)
-cont_list_Array = ReFineCont(cont_list_Array, size_img, 4)
+cont_list_Array = ReFineCont(cont_array_valid, cont_array_invalid, img_seg, 4)
 
 
 # json出力
@@ -229,7 +272,7 @@ for cont in cont_list_Array:
     pts_ary_ret.append(pts_ret)
 
 dict_ret = {}
-dict_ret["contours"] = [pts_ary_ret]
+dict_ret["contours"] = pts_ary_ret
 
 #print(json.dumps(dict_ret, indent=4))
 root, ext = os.path.splitext(json_path)
@@ -246,14 +289,12 @@ elapsed_time = time.time() - start
 
 # 画像のと表示
 img_mask = np.zeros((img_h, img_w, 3), np.uint8)
-for cont in cont_list_Array:
-    img_mask = cv2.drawContours(img_mask, [cont], 0, (255,255,255), -1)
-    img_mask = cv2.bitwise_and( img_seg.copy(), img_mask )
+img_mask = cv2.drawContours(img_mask, cont_list_Array, 0, (255,255,255), -1)
+img_mask = cv2.bitwise_and( img_seg.copy(), img_mask )
 
 alpha = 0.75
 img_ret = cv2.addWeighted(img_mask, alpha, img_seg, 1 - alpha, 0) 
-for cont in cont_list_Array:
-    img_ret = cv2.drawContours(img_ret, [cont], 0, (255,255,255), 2)
+img_ret = cv2.drawContours(img_ret, cont_list_Array, 0, (255,255,255), 1)
 
 cv2.imwrite(root + "_Mason.jpg", img_ret)
 if debug_out_lv >= 1:
