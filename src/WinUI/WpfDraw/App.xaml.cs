@@ -5,7 +5,7 @@ using System.Data;
 using System.Linq;
 using System.Windows;
 
-namespace WpfDraw
+namespace PyDraw
 {
     /// <summary>
     /// App.xaml の相互作用ロジック

@@ -1,10 +1,14 @@
-﻿<Window x:Class="WpfDraw.MainWindow"
+﻿<Window x:Class="PyDraw.MainWindow"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    Title="Drawing"
+    Title="SampleDraw"
     MouseDown="canvas_MouseDown" MouseMove="canvas_MouseMove" MouseUp="canvas_MouseUp" 
-    Background="LightGray" AllowDrop="True" DragEnter="event_DragEnter" Drop="event_Drop">
-	<DockPanel>
+    Background="LightGray" AllowDrop="True" DragEnter="event_DragEnter" Drop="event_Drop" Width="627.101" Height="591.842">
+    <DockPanel>
+        <ComboBox Name="cmbExtType" DockPanel.Dock="Top">
+            <ComboBoxItem>0 : Add Mode</ComboBoxItem>
+            <ComboBoxItem>1 : Sub Mode</ComboBoxItem>
+        </ComboBox>
         <Canvas Name="canvas">
         </Canvas>
     </DockPanel>

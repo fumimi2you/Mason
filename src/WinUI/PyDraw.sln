@@ -3,7 +3,7 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 15
 VisualStudioVersion = 15.0.28010.2050
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WpfDraw", "WpfDraw\WpfDraw.csproj", "{3E33510E-B36F-4E7D-8B53-63A19CEDCC79}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PyDraw", "WpfDraw\PyDraw.csproj", "{3E33510E-B36F-4E7D-8B53-63A19CEDCC79}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
